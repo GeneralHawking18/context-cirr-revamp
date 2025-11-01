@@ -1,0 +1,9 @@
+__pycache__/
+submission/
+subs/
+logs/
+TrainMix.py
+data
+checkpoints
+**.log
+.env

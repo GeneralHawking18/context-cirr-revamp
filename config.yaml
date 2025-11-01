@@ -1,0 +1,4 @@
+model_dir: ./checkpoints
+cirr_data_path: ./data/cirr
+hotel_data_path: ./data/hotels
+lasco_data_path: ./data/lasco

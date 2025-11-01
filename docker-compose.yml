@@ -1,0 +1,44 @@
+services:
+  context-cir:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      cache_from:
+        - context-cirr-improved
+    image: context-cirr-improved 
+
+    env_file:
+      - .env
+
+    volumes:
+      - ./src:/app/src
+      - ./data:/app/data
+      - ./checkpoints:/app/checkpoints
+
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+
+    ipc: host
+    network_mode: host
+
+    command: >-
+      python src/Train.py
+        --datasets cirr
+        --backbone_size B
+        --train_batch_size 128
+        --val_batch_size 128
+        --learning_rate 1e-5
+        --num_workers 16
+        --approx_steps 2700
+
+    stdin_open: true
+    tty: true
