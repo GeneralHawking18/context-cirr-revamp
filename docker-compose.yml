@@ -40,7 +40,7 @@ services:
         --learning_rate 1e-5
         --num_workers 16
         --approx_steps 2700
-        --wandb_mode online
+        --wandb_mode offline
 
     stdin_open: true
     tty: true
