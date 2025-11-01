@@ -9,7 +9,9 @@ from pathlib import Path
 from typing import Union, List, Literal, Optional
 import random
 import yaml
+import pickle
 
+from tqdm import tqdm
 
 class CIRDataset(Dataset):
     """Enhanced CIR dataset with noun phrase extraction."""
@@ -67,27 +69,53 @@ class CIRDataset(Dataset):
                 self.reference_paths.append(os.path.join(data_path, 'images', img_dir, *img_info["query_image"].split('/')[-3:]))
                 self.target_paths.append(os.path.join(data_path, 'images', img_dir, *img_info["result_image"].split('/')[-3:]))
                 self.captions.append(img_info["difference"])
+
         
         print(f"{split} dataset initialized with {len(self.reference_paths)} samples from {dataset_paths[dataset]}")
         
         # Pre-extract noun phrases if parser is provided
-        self.noun_phrases = []
-        self.np_spans = []
-        
-        if self.parser is not None:
-            self.captions = self.captions[:16]
-            print(f"Pre-extracting noun phrases for {len(self.captions)} captions...")
-            for caption in self.captions:
-                try:
-                    np_info = self.parser.extract_noun_phrases(caption, self.max_nps)
-                    self.noun_phrases.append(np_info["nps"])
-                    self.np_spans.append(np_info["spans"])
-                except Exception as e:
-                    print(f"Error extracting NPs: {e}")
-                    self.noun_phrases.append([])
-                    self.np_spans.append([])
+        # ================= Save/Load Preprocessed NP ==================
+        processed_dir = os.path.join(data_path, "processed")
+        os.makedirs(processed_dir, exist_ok=True)
+
+        cache_file = os.path.join(processed_dir, f"{dataset}_{split}_noun_phrases.pkl")
+
+        if os.path.exists(cache_file):
+            print(f"Loading cached noun phrases from {cache_file}")
+            with open(cache_file, "rb") as f:
+                cache_data = pickle.load(f)
+
             self.parser = None
-    
+            self.noun_phrases = cache_data["noun_phrases"]
+            self.np_spans = cache_data["np_spans"]
+
+        else:
+            self.noun_phrases = []
+            self.np_spans = []
+            
+            if self.parser is not None:
+                # self.captions = self.captions[:100]
+                print(f"Extracting noun phrases for {len(self.captions)} captions...")
+                for caption in tqdm(self.captions, desc="Extracting noun phrases"):
+                    try:
+                        np_info = self.parser.extract_noun_phrases(caption, self.max_nps)
+                        self.noun_phrases.append(np_info["nps"])
+                        self.np_spans.append(np_info["spans"])
+                    except Exception as e:
+                        print(f"Error extracting NP: {e}")
+                        self.noun_phrases.append([])
+                        self.np_spans.append([])
+
+                # Save cache
+                print(f"Saving extracted noun phrases to {cache_file}")
+                with open(cache_file, "wb") as f:
+                    pickle.dump({
+                        "noun_phrases": self.noun_phrases,
+                        "np_spans": self.np_spans
+                    }, f)
+                self.parser = None
+
+                
     def __getitem__(self, index) -> dict:
         """Returns a sample with noun phrases if available."""
         try:

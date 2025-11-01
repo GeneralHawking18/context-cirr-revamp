@@ -96,11 +96,38 @@ We provide utilities to produce submissions to the CIRR and CIRCO testing server
 ## 📁 Project Structure
 
 ```bash
-.
 ├── checkpoints/
 │   └── cirr/
+│
 ├── data/
 │   └── cirr/
+│       ├── LICENSE
+│       ├── README.md
+│       │
+│       ├── captions/
+│       │   ├── cap.rc2.test1.json
+│       │   ├── cap.rc2.train.json
+│       │   └── cap.rc2.val.json
+│       │
+│       ├── captions_ext/
+│       │   ├── cap.ext.rc2.test1.json
+│       │   ├── cap.ext.rc2.train.json
+│       │   └── cap.ext.rc2.val.json
+│       │
+│       ├── image_splits/
+│       │   ├── split.rc2.test1.json
+│       │   ├── split.rc2.train.json
+│       │   └── split.rc2.val.json
+│       │
+│       ├── img_raw/
+│       │   ├── dev/
+│       │   ├── test1/
+│       │   └── train/
+│       │
+│       └── processed/
+│           ├── cirr_train_noun_phrases.pkl
+│           └── cirr_val_noun_phrases.pkl
+│
 ├── src/
 │   ├── Dataset.py
 │   ├── Models.py
@@ -110,6 +137,7 @@ We provide utilities to produce submissions to the CIRR and CIRCO testing server
 │   ├── eval.py
 │   ├── make_cirr_sub.py
 │   └── utils.py
+│
 ├── Dockerfile
 ├── README.md
 ├── config.yaml
