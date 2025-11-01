@@ -33,6 +33,7 @@ services:
     command: >-
       python src/Train.py
         --datasets cirr
+        --devices 2
         --backbone_size B
         --train_batch_size 128
         --val_batch_size 128
