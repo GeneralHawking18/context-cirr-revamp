@@ -33,32 +33,19 @@ class Parser(nn.Module):
         self,
         text_encoder: CLIPTextModel,
         tokenizer: CLIPTokenizer,
-        stanza_dir: Optional[str] = "stanza_resources",
-        use_gpu: bool = True,
     ) -> None:
         super().__init__()
         
         self.text_encoder = text_encoder
         self.tokenizer = tokenizer
-
-        print(f"Loading Stanza model from local directory: {stanza_dir}")
-        try:
-            # ✅ Hoạt động hoàn toàn offline nếu model đã tải sẵn
-            self.nlp = stanza.Pipeline(
-                lang="en",
-                processors="tokenize,pos,constituency",
-                dir=stanza_dir,      # chỉ định thư mục chứa model local
-                use_gpu=use_gpu,
-            )
-            print("Stanza pipeline loaded successfully from local files.")
-        except Exception as e:
-            print(f"Failed to load local Stanza model: {e}")
-            raise e
+        self.nlp = stanza.Pipeline(
+            lang="en", processors="tokenize,pos,constituency", use_gpu=True
+        )
 
     def preprocess_prompt(self, prompt: str) -> str:
         return prompt.lower().strip().strip(".").strip()
 
-    def get_sub_nps(self, tree: Tree, left: int, right: int) -> List['SubNP']:
+    def get_sub_nps(self, tree: Tree, left: int, right: int) -> List[SubNP]:
         if isinstance(tree, str) or len(tree.leaves()) == 1:
             return []
 
@@ -83,13 +70,13 @@ class Parser(nn.Module):
             )
         return sub_nps
 
-    def get_all_nps(self, tree: Tree, full_sent: Optional[str] = None) -> 'AllNPs':
+    def get_all_nps(self, tree: Tree, full_sent: Optional[str] = None) -> AllNPs:
         start = 0
         end = len(tree.leaves())
 
         all_sub_nps = self.get_sub_nps(tree, left=start, right=end)
 
-        # Lấy các NP “thấp nhất” – không chứa NP con nào bên trong
+        # Get lowest (most specific) NPs - no other NP is contained within them
         lowest_nps = []
         for i in range(len(all_sub_nps)):
             span = all_sub_nps[i].span
@@ -124,9 +111,10 @@ class Parser(nn.Module):
                 tree = Tree.fromstring(str(sent.constituency))
                 all_nps = self.get_all_nps(tree, text)
                 
-                # Ưu tiên NP dài hơn (branch-level)
+                # Prioritize branch-level NPs over leaf-level
+                # Sort by span length (larger spans first for branch-level)
                 sorted_nps = sorted(
-                    zip(all_nps.nps[1:], all_nps.spans[1:]),  # bỏ full câu
+                    zip(all_nps.nps[1:], all_nps.spans[1:]),  # Skip full sentence
                     key=lambda x: x[1].right - x[1].left,
                     reverse=True
                 )
@@ -141,3 +129,4 @@ class Parser(nn.Module):
                 continue
                 
         return {"nps": nps[:max_nps], "spans": spans[:max_nps]}
+

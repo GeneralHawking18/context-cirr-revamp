@@ -181,8 +181,8 @@ class ConText(pl.LightningModule):
         )
         
         # Initialize parser for noun phrase extraction
-        from Parser import Parser
-        self.parser = Parser(self.text_encoder.model, self.text_encoder.tokenizer)
+        # from Parser import Parser
+        # self.parser = Parser(self.text_encoder.model, self.text_encoder.tokenizer)
 
     def forward(self, vision_input, text_input, return_attention=False):
         # Encode text and vision

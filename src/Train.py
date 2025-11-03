@@ -270,7 +270,8 @@ if __name__ == '__main__':
         model = model.to(memory_format=torch.channels_last)
     
     # Get parser from model
-    parser = model.parser
+    # parser = model.parser
+    parser= None
     
     # Load datasets with parser
     dataset_names = args.datasets.lower().split(',')

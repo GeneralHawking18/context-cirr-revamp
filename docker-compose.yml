@@ -1,15 +1,39 @@
+version: "3.9"
+
+networks:
+  restricted_net:
+    internal: true    # mạng kín, không ra ngoài
+  egress_net:
+    # mạng thường (compose sẽ tạo network bình thường cho proxy đi internet)
+    # có thể để trống -> dùng mạng mặc định
+    driver: bridge
+
 services:
+  proxy:
+    build:
+      context: ./proxy
+      dockerfile: Dockerfile
+    container_name: restricted-proxy
+    restart: unless-stopped
+    networks:
+      - restricted_net   # lắng nghe từ app
+      - egress_net       # đi internet
+    expose:
+      - "8888"           # chỉ mở trong network, không publish ra host
+    # Nếu muốn debug từ host: dùng "ports" thay cho "expose"
+    # ports:
+    #   - "8888:8888"
+
   context-cir:
     build:
       context: .
       dockerfile: Dockerfile
       cache_from:
         - context-cirr-improved
-    image: context-cirr-improved 
-
+    image: context-cirr-improved
+    container_name: context-cir
     env_file:
       - .env
-
     volumes:
       - ./src:/app/src
       - ./data:/app/data
@@ -27,18 +51,25 @@ services:
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility
 
+      # ép mọi HTTP/HTTPS traffic đi qua proxy
+      - http_proxy=http://proxy:8888
+      - https_proxy=http://proxy:8888
+
+      # không proxy cho nội bộ
+      - no_proxy=127.0.0.1,localhost,proxy,context-cir
+
     ipc: host
-    network_mode: host
+    networks:
+      - restricted_net   # chỉ nhìn thấy proxy
 
     command: >-
       python src/Train.py
         --datasets cirr
-        --devices 2
         --backbone_size B
-        --train_batch_size 128
-        --val_batch_size 128
+        --train_batch_size 4
+        --val_batch_size 4
         --learning_rate 1e-5
-        --num_workers 16
+        --num_workers 4
         --approx_steps 2700
         --wandb_mode offline
 
