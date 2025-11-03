@@ -1,4 +1,4 @@
-# ==================== Parser.py ====================
+# ==================== parser_fixed.py ====================
 import torch
 import torch.nn as nn
 import numpy as np
@@ -33,13 +33,27 @@ class Parser(nn.Module):
         self,
         text_encoder: CLIPTextModel,
         tokenizer: CLIPTokenizer,
+        stanza_dir: str = "./stanza_resources",
+        use_gpu: bool = True,
     ) -> None:
         super().__init__()
-        
+
         self.text_encoder = text_encoder
         self.tokenizer = tokenizer
+
+        # 🧠 Try to download from Hugging Face if resources missing
+        try:
+            stanza.download("en", source="huggingface", dir=stanza_dir)
+        except Exception as e:
+            print(f"[Warning] Could not download from Hugging Face: {e}")
+            print("Assuming resources already exist locally...")
+
+        # Load pipeline
         self.nlp = stanza.Pipeline(
-            lang="en", processors="tokenize,pos,constituency", use_gpu=True
+            lang="en",
+            processors="tokenize,pos,constituency",
+            dir=stanza_dir,
+            use_gpu=use_gpu,
         )
 
     def preprocess_prompt(self, prompt: str) -> str:
@@ -73,7 +87,6 @@ class Parser(nn.Module):
     def get_all_nps(self, tree: Tree, full_sent: Optional[str] = None) -> AllNPs:
         start = 0
         end = len(tree.leaves())
-
         all_sub_nps = self.get_sub_nps(tree, left=start, right=end)
 
         # Get lowest (most specific) NPs - no other NP is contained within them
@@ -102,31 +115,27 @@ class Parser(nn.Module):
     def extract_noun_phrases(self, text: str, max_nps: int = 10) -> Dict:
         """Extract noun phrases from text using Stanza parser."""
         doc = self.nlp(text)
-        
-        nps = []
-        spans = []
-        
+        nps, spans = [], []
+
         for sent in doc.sentences:
             try:
                 tree = Tree.fromstring(str(sent.constituency))
                 all_nps = self.get_all_nps(tree, text)
-                
-                # Prioritize branch-level NPs over leaf-level
-                # Sort by span length (larger spans first for branch-level)
+
+                # Sort by span length (larger = higher-level NP first)
                 sorted_nps = sorted(
-                    zip(all_nps.nps[1:], all_nps.spans[1:]),  # Skip full sentence
+                    zip(all_nps.nps[1:], all_nps.spans[1:]),
                     key=lambda x: x[1].right - x[1].left,
-                    reverse=True
+                    reverse=True,
                 )
-                
+
                 for np_text, span in sorted_nps[:max_nps]:
                     if np_text not in nps:
                         nps.append(np_text)
                         spans.append(span)
-                        
+
             except Exception as e:
                 print(f"Error parsing sentence: {e}")
                 continue
-                
-        return {"nps": nps[:max_nps], "spans": spans[:max_nps]}
 
+        return {"nps": nps[:max_nps], "spans": spans[:max_nps]}
