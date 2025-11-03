@@ -41,19 +41,18 @@ class Parser(nn.Module):
         self.text_encoder = text_encoder
         self.tokenizer = tokenizer
 
-        print(f"🔍 Loading Stanza model from local directory: {stanza_dir}")
+        print(f"Loading Stanza model from local directory: {stanza_dir}")
         try:
-            # ✅ Load Stanza pipeline hoàn toàn offline
+            # ✅ Hoạt động hoàn toàn offline nếu model đã tải sẵn
             self.nlp = stanza.Pipeline(
                 lang="en",
                 processors="tokenize,pos,constituency",
-                dir=stanza_dir,          # chỉ định thư mục local
+                dir=stanza_dir,      # chỉ định thư mục chứa model local
                 use_gpu=use_gpu,
-                download_method=None,    # tránh auto-download
             )
-            print("✅ Stanza pipeline loaded successfully from local files.")
+            print("Stanza pipeline loaded successfully from local files.")
         except Exception as e:
-            print(f"❌ Failed to load local Stanza model: {e}")
+            print(f"Failed to load local Stanza model: {e}")
             raise e
 
     def preprocess_prompt(self, prompt: str) -> str:
@@ -90,7 +89,7 @@ class Parser(nn.Module):
 
         all_sub_nps = self.get_sub_nps(tree, left=start, right=end)
 
-        # Get lowest (most specific) NPs - no other NP is contained within them
+        # Lấy các NP “thấp nhất” – không chứa NP con nào bên trong
         lowest_nps = []
         for i in range(len(all_sub_nps)):
             span = all_sub_nps[i].span
@@ -125,10 +124,9 @@ class Parser(nn.Module):
                 tree = Tree.fromstring(str(sent.constituency))
                 all_nps = self.get_all_nps(tree, text)
                 
-                # Prioritize branch-level NPs over leaf-level
-                # Sort by span length (larger spans first for branch-level)
+                # Ưu tiên NP dài hơn (branch-level)
                 sorted_nps = sorted(
-                    zip(all_nps.nps[1:], all_nps.spans[1:]),  # Skip full sentence
+                    zip(all_nps.nps[1:], all_nps.spans[1:]),  # bỏ full câu
                     key=lambda x: x[1].right - x[1].left,
                     reverse=True
                 )
