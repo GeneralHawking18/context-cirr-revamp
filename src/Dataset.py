@@ -75,7 +75,7 @@ class CIRDataset(Dataset):
         
         # Pre-extract noun phrases if parser is provided
         # ================= Save/Load Preprocessed NP ==================
-        processed_dir = os.path.join(data_path, "processed_temp")
+        processed_dir = os.path.join(data_path, "processed")
         os.makedirs(processed_dir, exist_ok=True)
 
         cache_file = os.path.join(processed_dir, f"{dataset}_{split}_noun_phrases.pkl")
