@@ -1,4 +1,4 @@
-# ==================== parser_fixed.py ====================
+# ==================== Parser.py ====================
 import torch
 import torch.nn as nn
 import numpy as np
@@ -33,33 +33,33 @@ class Parser(nn.Module):
         self,
         text_encoder: CLIPTextModel,
         tokenizer: CLIPTokenizer,
-        stanza_dir: str = "./stanza_resources",
+        stanza_dir: Optional[str] = "stanza_resources",
         use_gpu: bool = True,
     ) -> None:
         super().__init__()
-
+        
         self.text_encoder = text_encoder
         self.tokenizer = tokenizer
 
-        # 🧠 Try to download from Hugging Face if resources missing
+        print(f"🔍 Loading Stanza model from local directory: {stanza_dir}")
         try:
-            stanza.download("en", source="huggingface", dir=stanza_dir)
+            # ✅ Load Stanza pipeline hoàn toàn offline
+            self.nlp = stanza.Pipeline(
+                lang="en",
+                processors="tokenize,pos,constituency",
+                dir=stanza_dir,          # chỉ định thư mục local
+                use_gpu=use_gpu,
+                download_method=None,    # tránh auto-download
+            )
+            print("✅ Stanza pipeline loaded successfully from local files.")
         except Exception as e:
-            print(f"[Warning] Could not download from Hugging Face: {e}")
-            print("Assuming resources already exist locally...")
-
-        # Load pipeline
-        self.nlp = stanza.Pipeline(
-            lang="en",
-            processors="tokenize,pos,constituency",
-            dir=stanza_dir,
-            use_gpu=use_gpu,
-        )
+            print(f"❌ Failed to load local Stanza model: {e}")
+            raise e
 
     def preprocess_prompt(self, prompt: str) -> str:
         return prompt.lower().strip().strip(".").strip()
 
-    def get_sub_nps(self, tree: Tree, left: int, right: int) -> List[SubNP]:
+    def get_sub_nps(self, tree: Tree, left: int, right: int) -> List['SubNP']:
         if isinstance(tree, str) or len(tree.leaves()) == 1:
             return []
 
@@ -84,9 +84,10 @@ class Parser(nn.Module):
             )
         return sub_nps
 
-    def get_all_nps(self, tree: Tree, full_sent: Optional[str] = None) -> AllNPs:
+    def get_all_nps(self, tree: Tree, full_sent: Optional[str] = None) -> 'AllNPs':
         start = 0
         end = len(tree.leaves())
+
         all_sub_nps = self.get_sub_nps(tree, left=start, right=end)
 
         # Get lowest (most specific) NPs - no other NP is contained within them
@@ -115,27 +116,30 @@ class Parser(nn.Module):
     def extract_noun_phrases(self, text: str, max_nps: int = 10) -> Dict:
         """Extract noun phrases from text using Stanza parser."""
         doc = self.nlp(text)
-        nps, spans = [], []
-
+        
+        nps = []
+        spans = []
+        
         for sent in doc.sentences:
             try:
                 tree = Tree.fromstring(str(sent.constituency))
                 all_nps = self.get_all_nps(tree, text)
-
-                # Sort by span length (larger = higher-level NP first)
+                
+                # Prioritize branch-level NPs over leaf-level
+                # Sort by span length (larger spans first for branch-level)
                 sorted_nps = sorted(
-                    zip(all_nps.nps[1:], all_nps.spans[1:]),
+                    zip(all_nps.nps[1:], all_nps.spans[1:]),  # Skip full sentence
                     key=lambda x: x[1].right - x[1].left,
-                    reverse=True,
+                    reverse=True
                 )
-
+                
                 for np_text, span in sorted_nps[:max_nps]:
                     if np_text not in nps:
                         nps.append(np_text)
                         spans.append(span)
-
+                        
             except Exception as e:
                 print(f"Error parsing sentence: {e}")
                 continue
-
+                
         return {"nps": nps[:max_nps], "spans": spans[:max_nps]}
